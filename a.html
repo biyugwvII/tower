@@ -20,6 +20,7 @@
     100% {font-size:30px;z-index:1000;opacity:0;}
     }
     .tower span{display: inline-block;width:20px;height:20px;border-radius:50%;cursor:pointer;line-height: 20px;}
+    #fps{position:fixed;width:100px;height:40px;background:rgba(255,255,255,.5);font-size:20px;line-height:40px;text-align: center;}
 </style>
 
 </head>
@@ -40,6 +41,8 @@
         <div class="btn" id="gameBtn">开始</div>
     </div>
     <div id="gameTips" class="gameTips">游戏开始</div>
+    <div id="fps">FPS:<span id="fpsNum">60</span></div>
+    
 </body>
 <script>
     const g = {
@@ -47,7 +50,11 @@
             oh : window.innerHeight,
             w : 720,
             h : 320,
-            t1 : 0
+            t1 : 0,
+            fps : {
+                t : (+new Date),
+                n : 0
+            }
         }
     const ctx = canvas.getContext("2d");
     const Log = []; // type target[A-B-C] value unit stat etc.
@@ -61,7 +68,7 @@
             opt : {
                 
             },
-            enemy : [],
+            enemys : [],
             towers : [],
             enemyTypes : {
                     L1 : {
@@ -104,9 +111,9 @@
                             money : 300,
                             sale : 200,
                             force : {
-                                attack : 10,
+                                attack : 5,
                                 limits : 50,
-                                rate : 2,
+                                rate : 1,
                             },
                         },
                         L2 : {
@@ -114,9 +121,9 @@
                             money : 500,
                             sale : 300,
                             force : {
-                                attack : 20,
+                                attack : 10,
                                 limits : 80,
-                                rate : 3,
+                                rate : 1,
                             },
                         },
                         L3 : {
@@ -126,7 +133,7 @@
                             force : {
                                 attack : 20,
                                 limits : 100,
-                                rate : 5,
+                                rate : 2,
                             },
                         }
             },
@@ -143,6 +150,8 @@
                 canvas.style.left = (g.ow-g.w)/2+"px";
                 panel.style.top = (g.oh-g.h)/2+"px";
                 panel.style.left = (g.ow-g.w)/2+"px";
+                fps.style.right = (g.ow/2-360)+'px';
+                fps.style.bottom = (g.oh/2-160)+'px';
                 gameTips.style.display = "block";
                 gameBtn.style.display = "block";
                 it.opt = opt;
@@ -175,8 +184,8 @@
             },
             enemyDie :function(i){
                 const it = this;
-                it.enemy.splice(i,1);
-                if(!it.enemy.length) it.enemyLastDieTime = (+new Date);
+                it.enemys.splice(i,1);
+                if(!it.enemys.length) it.enemyLastDieTime = (+new Date);
             },
             addCoin : function(m,x,y){
                 const it = this;
@@ -210,7 +219,7 @@
             },
             createNpc : function(){
                 const it = this;
-                if(!it.enemy.length){
+                if(!it.enemys.length){
                     if(Level.wave == Level.enemy[Level.level].length-1 && it.stat == 2){
                         Level.level++;
                         Level.wave = 0;
@@ -229,7 +238,7 @@
                         while(v--){
                             var e = new Enemy(x);
                             e.MaxHP = e.HP;
-                            it.enemy.push(e);
+                            it.enemys.push(e);
                         }
                         
                     }
@@ -244,12 +253,12 @@
             npcLogic : function(){
                     const it = this;
                     var npcnum = 0;
-                    for(let x in it.enemy){
+                    for(let x in it.enemys){
                         x = ~~x;
-                        var v = it.enemy[x];
+                        var v = it.enemys[x];
                         if(!v.show){
                             if(npcnum == x){ // 当前需要出战的npc
-                                if(!x || (x && (+new Date) - it.enemy[x-1].showTime > 2000)){
+                                if(!x || (x && (+new Date) - it.enemys[x-1].showTime > 2000)){
                                     v.showTime = (+new Date);
                                     it.enemyLastShowTime = (+new Date);
                                     v.show = 1;
@@ -259,7 +268,7 @@
                             
                         }else{
                             npcnum++;
-                            const speed = v.speed/1;
+                            const speed = v.speed/3;
                             // 获取（修正）敌人当前的位置，通过对周围的道路判断前进方向
                             
                             let i,j ;
@@ -289,7 +298,6 @@
                                 it.HP-=v.force.attack;
                                 myhp.innerText = it.HP;
                             }
-                            if(Math.random()>0.5) v.beShot(1)
                             if(v.HP<=0){
                                 it.enemyDie(x);
                                 it.addCoin(v.money,v.p[0]-10,v.p[1]);
@@ -308,7 +316,15 @@
             drawTower : function(){
                 const it =  this;
                 for(var x in it.towers){
-                    var v = it.towers[x];
+                    const v = it.towers[x];
+                    for(var i in v.bullets){
+                        const b = v.bullets[i];
+                        ctx.beginPath();
+                        ctx.fillStyle = b.style;
+                        ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+                        ctx.fill();
+                        ctx.closePath();
+                    }
                     ctx.beginPath();
                     ctx.fillStyle = v.style;
                     ctx.arc(v.x,v.y,10,0,Math.PI*2);
@@ -320,20 +336,34 @@
                 const it = this;
                 for(var x in it.towers){
                     var v = it.towers[x];
-                    if(!v.bulletTime) v.bulletTime = 0;
-                    if((+new Date) - v.bulletTime > (1000/v.force.rate)){
-                        var hasCanAttactEnemy = 0;
-                        for(var y in it.enemys){
-                            var e = it.enemys[y],dst = distance(e.x,e.y,v.x,v.y);
-                            if( dst <= v.force.limits ){  // 目前是就近原则，也可以就靠近出处原则
-                                hasCanAttactEnemy = 1;
-                                break;
-                            }
-                        }
-                        if(hasCanAttactEnemy){
-                            v.addBullet();
+                    var minDst = 10000,p = [0,0];
+                    for(var y in it.enemys){
+                        var e = it.enemys[y],dst = distance(e.p[0],e.p[1],v.x,v.y);
+                        if( dst <= v.force.limits && dst<minDst){  // 目前是就近原则，也可以就靠近出处原则
+                            minDst = dst;
+                            p = e.p;
                         }
                     }
+                    if((+new Date) - v.bulletTime > (1000/v.force.rate)){
+                        
+                        if(minDst<10000){
+                            v.addBullet();
+                        }else{
+                            v.bullets = [];
+                        }
+                    }
+                    for(var i in v.bullets){
+                        const b = v.bullets[i];
+                        if(p[0] || p[1]) b.go(p);
+                        for(var  j in it.enemys){
+                            var e = it.enemys[j],dst = distance(e.p[0],e.p[1],b.x,b.y);
+                            if(dst<=(b.r+10)){
+                                e.beShot(v.force.attack);
+                                v.bullets.splice(i,1);
+                            }
+                        }
+                    }
+
                     
                 }
             },
@@ -358,8 +388,8 @@
             },
             drawNpc : function(){
                 const it = this;
-                for(let x in it.enemy){
-                    var v = it.enemy[x];
+                for(let x in it.enemys){
+                    var v = it.enemys[x];
                     if(v.show){
                         ctx.beginPath();
                         ctx.fillStyle = v.style;
@@ -442,6 +472,12 @@
                     }
                     
                 }
+                g.fps.n++;
+                if((+new Date) - g.fps.t >=1000){
+                    fpsNum.innerText = g.fps.n;
+                    g.fps.n = 0;
+                    g.fps.t = (+new Date);
+                }
                 window.requestAnimationFrame(function(){
                     it.run();
                 })
@@ -478,6 +514,7 @@
         this.y = j*20;
         this.bullets = []
         this.addtime = (+new Date);
+        this.bulletTime = (+new Date);
         for(var x in Game.towerTypes[type]){
             this[x] = Game.towerTypes[type][x];
         }
@@ -487,6 +524,14 @@
             addBullet : function(){
                 const  it = this;
                 it.bullets.push(new Bullet(it.x,it.y,3,it.style));
+                it.bulletTime = (+new Date);
+                const a = document.createElement("audio");
+                a.src = 'audio/gun.mp3';
+                a.play();
+                a.addEventListener("ended", function() {
+                    alert(0)
+                }, false)
+                
             } 
     }
 
@@ -497,10 +542,12 @@
         this.s = s;
     }
     Bullet.prototype = {
-        move : function(dx,dy){
-            this.x+=dx;
-            this.y+=dy;
+        go : function(op){
+            const dx = op[0]-this.x,dy = op[1]-this.y ,n = 5/Math.sqrt(dx*dx+dy*dy);
+            this.x+=dx*n;
+            this.y+=dy*n;
         }
+        
     }
     
     
