@@ -30,7 +30,7 @@
         <div class="part">关卡：<span id="levelnum">0</span></div>
         <div class="part">生命值：<span id="myhp">0</span></div>
         <div class="part">金钱：<span id="coin">0</span></div>
-        <div class="part fr">敌人：
+        <div class="part fr" style="width:130px;">敌人：
             <span id="enemyL1"><font id="enemyL1num">0</font></span>-<span id="enemyL2"><font id="enemyL2num">0</font></span>-<span id="enemyL3"><font id="enemyL3num">0</font></span>
         </div>
         <div class="part fr tower">防御塔：
@@ -162,7 +162,7 @@
                 towerL1.style.background = "none";
                 towerL2.style.background = "none";
                 towerL3.style.background = "none";
-                it.setCoin(1000);
+                it.setCoin(10000);
                 it.run();
             },
             setGrid(){
@@ -187,7 +187,7 @@
                 it.enemys.splice(i,1);
                 if(!it.enemys.length) it.enemyLastDieTime = (+new Date);
             },
-            addCoin : function(m,x,y){
+            coinAnimation : function(m,x,y){
                 const it = this;
                 it.coinAnimate.push({
                     m : m,
@@ -197,7 +197,7 @@
                 })
                 it.setCoin(m);
             },
-            setCoin : function(m){
+            setCoin : function(m){  
                 const it = this;
                 it.money+=(parseFloat(m));
                 coin.innerText = (~~it.money);
@@ -300,7 +300,7 @@
                             }
                             if(v.HP<=0){
                                 it.enemyDie(x);
-                                it.addCoin(v.money,v.p[0]-10,v.p[1]);
+                                it.coinAnimation(v.money,v.p[0]-10,v.p[1]);
                             }
                         }
                         
@@ -348,9 +348,10 @@
                         
                         if(minDst<10000){
                             v.addBullet();
-                        }else{
-                            v.bullets = [];
                         }
+                    }
+                    if(minDst == 10000){
+                        v.bullets = [];
                     }
                     for(var i in v.bullets){
                         const b = v.bullets[i];
@@ -358,8 +359,8 @@
                         for(var  j in it.enemys){
                             var e = it.enemys[j],dst = distance(e.p[0],e.p[1],b.x,b.y);
                             if(dst<=(b.r+10)){
-                                e.beShot(v.force.attack);
                                 v.bullets.splice(i,1);
+                                e.beShot(v.force.attack);
                             }
                         }
                     }
@@ -421,29 +422,35 @@
                 const it = this;
                 const list = [i+j*36,(i-1)+j*36,i+(j-1)*36,i-1+(j-1)*36];
                 let ret = true;
-                list.forEach(function(v,i){
-                    if(typeof Map[Level.level][v] == 'undefined' || Map[Level.level][v]==1) {
-                        ret = false;
-                    }
-                })
+                if(Map[Level.level][i+j*36] == 2) ret = false;
+                if(ret){
+                    list.forEach(function(v,i){
+                        if(typeof Map[Level.level][v] == 'undefined' || Map[Level.level][v]==1) {
+                            ret = false;
+                        }
+                    })
+                }
                 return ret;
             },
             run(){
                 const it = this;
-                
+                if(!it.HP){
+                    alert("Game Over");
+                    return;
+                }
                 const opt = it.opt;
                 ctx.clearRect(0,0,g.w,g.h);
                 ctx.fillStyle="rgba(0,0,0,1)"
                 ctx.fillRect(0,0,g.w,g.h);
                 if(opt.grid == "open") it.setGrid();
-                if( it.stat >0 ){
+                if( it.stat >0 && !it.pause){
                     // create npc 
                     it.createNpc();
                     // npc  logic 
                     it.npcLogic();
-                    // draw npc
+                    // tower npc
                     it.towerLogic();
-                    
+                    // money add
                     it.setCoin(0.1);
                 }
                 // draw map
@@ -451,10 +458,7 @@
                 it.drawNpc();
                 it.drawTower();
                 
-                if(!it.HP){
-                    alert("Game Over");
-                    return;
-                }
+                
                 if(it.movePoint){
                     if(it.canBuild(it.movePoint[0],it.movePoint[1])){
                         const type = g.addTower.replace("tower",""),style = it.towerTypes[type].style,limits = it.towerTypes[type].force.limits;
@@ -467,6 +471,32 @@
                         ctx.fillStyle = style;
                         ctx.arc(it.movePoint[0]*20,it.movePoint[1]*20,10,0,Math.PI*2);
                         ctx.fill();
+                        ctx.closePath();
+                        it.preTower = [type,it.movePoint[0],it.movePoint[1]]
+                    }else{
+                        const type = g.addTower.replace("tower",""),style = it.towerTypes[type].style,limits = it.towerTypes[type].force.limits;
+                        //ctx.beginPath();
+                        //ctx.fillStyle = "rgba(255,255,255,.3)";
+                        //ctx.arc(it.movePoint[0]*20,it.movePoint[1]*20,limits,0,Math.PI*2);
+                        //ctx.fill();
+                        //ctx.closePath();
+                        ctx.beginPath();
+                        ctx.fillStyle = "rgba(255,0,0,.8)";
+                        ctx.arc(it.movePoint[0]*20,it.movePoint[1]*20,10,0,Math.PI*2);
+                        ctx.fill();
+                        ctx.closePath();
+                        ctx.beginPath();
+                        ctx.fillStyle = "rgba(255,255,255,.8)";
+                        ctx.arc(it.movePoint[0]*20,it.movePoint[1]*20,8,0,Math.PI*2);
+                        ctx.fill();
+                        ctx.closePath();
+                        ctx.beginPath();
+                        ctx.strokeStyle = "rgba(255,0,0,.8)";
+                        ctx.moveTo(it.movePoint[0]*20+7.07,it.movePoint[1]*20-7.07);
+                        ctx.lineTo(it.movePoint[0]*20-7.07,it.movePoint[1]*20+7.07);
+                        ctx.moveTo(it.movePoint[0]*20-7.07,it.movePoint[1]*20-7.07);
+                        ctx.lineTo(it.movePoint[0]*20+7.07,it.movePoint[1]*20+7.07);
+                        ctx.stroke();
                         ctx.closePath();
                         it.preTower = [type,it.movePoint[0],it.movePoint[1]]
                     }
@@ -539,7 +569,7 @@
         this.x = x;
         this.y = y;
         this.r = r;
-        this.s = s;
+        this.style = s;
     }
     Bullet.prototype = {
         go : function(op){
@@ -556,13 +586,14 @@
         if(g.t1){
             clearTimeout(g.t1);
             g.t1 = 0;
-            gameTips.className = "";
             
         }
+        Game.pause = 1;
         gameTips.innerText = msg;
         gameTips.className = "tipsshow";
         g.t1 = setTimeout(function(){
             gameTips.className = "";
+            Game.pause = 0;
         },2000)
     }
     document.querySelectorAll(".tower").forEach(function(v,i){
@@ -577,7 +608,7 @@
         }
     })
     document.body.addEventListener("mouseup",function(){
-        if(Game.preTower){
+        if(Game.preTower && Game.canBuild(Game.preTower[1],Game.preTower[2])){
             Game.createTower(Game.preTower[0],Game.preTower[1],Game.preTower[2]);
         }
         g.addTower = 0;
@@ -587,20 +618,31 @@
     })
     canvas.addEventListener("mousemove",function(e){
         const x = e.offsetX,y = e.offsetY;
-        const i = ~~(x/20),j = ~~(y/20);
-        if(g.addTower){
-            if(distance(x,y,i*20,j*20)<14) {
-                Game.movePoint = [i,j];
-            }else if(distance(x,y,(i+1)*20,j*20)<14){
-                Game.movePoint = [i+1,j];
-            }else if(distance(x,y,i*20,(j+1)*20)<14){
-                Game.movePoint = [i,j+1];
-            }else if(distance(x,y,(i+1)*20,(j+1)*20)<14){
-                Game.movePoint = [i+1,j+1];
-            }else{
-                Game.movePoint = 0;
-            }
+        let i = ~~(x/20),j = ~~(y/20);
+        
+        if(distance(x,y,i*20,j*20)<14) {
             
+        }else if(distance(x,y,(i+1)*20,j*20)<14){
+            i++;
+        }else if(distance(x,y,i*20,(j+1)*20)<14){
+            j++;
+        }else if(distance(x,y,(i+1)*20,(j+1)*20)<14){
+            i++;
+            j++;
+        }else{
+            i=0;
+            j=0;
+        }
+        if(g.addTower){
+           if(i || j) Game.movePoint = [i,j];
+           else Game.movePoint = 0;
+            
+        }else{
+            if(Map[Level.level][i+j*36] == 2){
+                canvas.style.cursor = "pointer";
+            }else{
+                canvas.style.cursor = "default";
+            }
         }
     })
     const Map = [
@@ -674,6 +716,7 @@
     gameBtn.addEventListener("click",function(){
         if(Game.stat<=0){
             Game.stat = 1;
+            
             if(!Game.stat) {
                 showTips("游戏开始");
                 Game.startTime = (+new Date);
